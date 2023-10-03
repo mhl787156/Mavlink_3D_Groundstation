@@ -244,9 +244,9 @@ def get_elevation_data():
 
     lat = float(request.args.get('lat'))
     long = float(request.args.get('long'))
-    zoom = float(request.args.get('zoom'))
+    zoom = int(request.args.get('zoom'))
 
-    x_tile, y_tile = deg2num(lat, long)
+    x_tile, y_tile = deg2num(lat, long, zoom)
     # x_tile = 3826
     # y_tile = 6127
 
@@ -272,7 +272,7 @@ def get_elevation_data():
     image = Image.open(BytesIO(response.content))
     image.show()
 
-    width, height = image.size()
+    width, height = image.size
 
     pixels = list(image.getdata())
     elevations = []
