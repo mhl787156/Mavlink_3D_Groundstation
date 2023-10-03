@@ -254,6 +254,7 @@ def num2deg(xtile, ytile, zoom):
     return lat_deg, lon_deg
 
 image = None
+satellite_image = None
 
 @app.route('/api/elevationData', methods=['GET'])
 def get_elevation_data():
@@ -277,20 +278,27 @@ def get_elevation_data():
 
     # Replace 'YOUR_MAPBOX_ELEVATION_API_ENDPOINT' with the appropriate Mapbox Elevation API endpoint
     mapbox_elevation_endpoint = f'https://api.mapbox.com/v4/mapbox.mapbox-terrain-dem-v1/{zoom}/{x_tile}/{y_tile}.pngraw'
+    mapbox_satellite_endpoint = f'https://api.mapbox.com/v4/mapbox.satellite/{zoom}/{x_tile}/{y_tile}.jpg'
 
     global image
+    global satellite_image
     if image is None:
         # Make a request to the Mapbox API to fetch the elevation map in PNG format
         response = requests.get(mapbox_elevation_endpoint, params={'access_token': mapbox_access_token})
-        print(response)
-
         if response.status_code != 200:
             abort(200, 'Failed to fetch elevation data')
 
         # Read the PNG image and calculate elevations
         image = Image.open(BytesIO(response.content))
 
-    image.show()
+        # Make a request to the Mapbox API to fetch the satellite map in PNG format
+        response = requests.get(mapbox_satellite_endpoint, params={'access_token': mapbox_access_token})
+        print(response)
+        if response.status_code != 200:
+            abort(200, 'Failed to fetch Satellite data')
+
+        satellite_image = Image.open(BytesIO(response.content))
+
 
     width, height = image.size
 
@@ -305,4 +313,5 @@ def get_elevation_data():
     # Return the elevation data as JSON
     return jsonify(width=width, height=height,
                    xcenter=width*xfrac, ycenter=height*yfrac,
-                   elevationData=elevations)
+                   elevationData=elevations,
+                   satelliteImage=list(satellite_image.getdata()))
