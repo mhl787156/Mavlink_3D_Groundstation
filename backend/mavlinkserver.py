@@ -14,9 +14,12 @@ from pymavlink import mavutil
 import mavconn
 
 from flask import Flask, jsonify, request, abort
+from flask_cors import CORS
 
 app = Flask(__name__)
 
+# Enalbe Cross origin for api endpoints
+CORS(app, resources={r"/api/*": {"origins": "http://localhost:8000"}})
 
 @dataclass
 class Drone():
@@ -232,12 +235,25 @@ def get_drone_rel():
             {}
         )
 
+def deg2tile_fraction(lat_deg, lon_deg, zoom):
+    lat_rad = math.radians(lat_deg)
+    n = 1 << zoom
+    xfrac = (lon_deg + 180.0) / 360.0 * n
+    yfrac = (1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n
+    return xfrac, yfrac
+
 def deg2num(lat_deg, lon_deg, zoom):
-  lat_rad = math.radians(lat_deg)
-  n = 1 << zoom
-  xtile = int((lon_deg + 180.0) / 360.0 * n)
-  ytile = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
-  return xtile, ytile
+    xfrac, yfrac = deg2tile_fraction(lat_deg, lon_deg, zoom)
+    return int(xfrac), int(yfrac)
+
+def num2deg(xtile, ytile, zoom):
+    n = 1 << zoom
+    lon_deg = xtile / n * 360.0 - 180.0
+    lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * ytile / n)))
+    lat_deg = math.degrees(lat_rad)
+    return lat_deg, lon_deg
+
+image = None
 
 @app.route('/api/elevationData', methods=['GET'])
 def get_elevation_data():
@@ -246,10 +262,13 @@ def get_elevation_data():
     long = float(request.args.get('long'))
     zoom = int(request.args.get('zoom'))
 
+    # Get Map Tile Number
     x_tile, y_tile = deg2num(lat, long, zoom)
-    # x_tile = 3826
-    # y_tile = 6127
 
+    # Get location of lat long within the tile
+    xfrac, yfrac = deg2tile_fraction(lat, long, zoom)
+    xfrac = xfrac - x_tile # 0 < x < 1
+    yfrac = yfrac - y_tile # 0 < y < 1
 
     # Replace 'YOUR_MAPBOX_ACCESS_TOKEN' with your Mapbox access token
     mapbox_access_token = os.getenv("MAPBOX_ACCESS_TOKEN", None)
@@ -259,17 +278,18 @@ def get_elevation_data():
     # Replace 'YOUR_MAPBOX_ELEVATION_API_ENDPOINT' with the appropriate Mapbox Elevation API endpoint
     mapbox_elevation_endpoint = f'https://api.mapbox.com/v4/mapbox.mapbox-terrain-dem-v1/{zoom}/{x_tile}/{y_tile}.pngraw'
 
-    print(mapbox_elevation_endpoint)
+    global image
+    if image is None:
+        # Make a request to the Mapbox API to fetch the elevation map in PNG format
+        response = requests.get(mapbox_elevation_endpoint, params={'access_token': mapbox_access_token})
+        print(response)
 
-    # Make a request to the Mapbox API to fetch the elevation map in PNG format
-    response = requests.get(mapbox_elevation_endpoint, params={'access_token': mapbox_access_token})
-    print(response)
+        if response.status_code != 200:
+            abort(200, 'Failed to fetch elevation data')
 
-    if response.status_code != 200:
-        abort(200, 'Failed to fetch elevation data')
+        # Read the PNG image and calculate elevations
+        image = Image.open(BytesIO(response.content))
 
-    # Read the PNG image and calculate elevations
-    image = Image.open(BytesIO(response.content))
     image.show()
 
     width, height = image.size
@@ -283,4 +303,6 @@ def get_elevation_data():
         elevations.append(elevation)
 
     # Return the elevation data as JSON
-    return jsonify(width=width, height=height, elevationData=elevations)
+    return jsonify(width=width, height=height,
+                   xcenter=width*xfrac, ycenter=height*yfrac,
+                   elevationData=elevations)

@@ -26,6 +26,9 @@ class ThreeSceneManager {
         this.light = new THREE.DirectionalLight(0xffffff, 1);
         this.light.position.set(1, 1, 1);
         this.scene.add(this.light);
+
+        this.addFloor()
+
         console.log("Screen manager initialised")
     }
 
@@ -43,6 +46,49 @@ class ThreeSceneManager {
         const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
         const cube = new THREE.Mesh(geometry, material);
         this.scene.add(cube);
+    }
+
+    addFloor() {
+        // Create a floor plane
+        const floorGeometry = new THREE.PlaneGeometry(10, 10, 1, 1);
+        const floorMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaaaa, side: THREE.DoubleSide });
+        this.floor = new THREE.Mesh(floorGeometry, floorMaterial);
+
+        // Position the floor at the bottom of the scene
+        this.floor.position.set(0, 0, 0);
+
+        // Rotate the floor to make it horizontal
+        this.floor.rotation.x = -Math.PI / 2;
+
+        // Add the floor to the scene
+        this.scene.add(this.floor);
+    }
+
+    addElevationMap(width, height, centerx, centery, elevationData) {
+        // Create a floor plane
+        const geometry = new THREE.PlaneGeometry(width, height, 1, 1);
+        const floorMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaaaa, side: THREE.DoubleSide });
+
+        const vertex = new THREE.Vector3();
+        const positionAttribute = geometry.getAttribute( 'position' );
+        for (let i = 0; i < positionAttribute.count; i++) {
+            vertex.fromBufferAttribute( positionAttribute, i ); // read vertex
+            const elevationValue = elevationData[i]; // Adjust this based on your data format
+            positionAttribute.setXYZ(i, vertex.x, vertex.y, elevationValue)
+        }
+        geometry.setAttribute('position', positionAttribute);
+
+        // Compute face normals and vertex normals for shading
+        // geometry.computeFaceNormals();
+        geometry.computeVertexNormals();
+
+        this.scene.remove(this.floor)
+        this.floor = new THREE.Mesh(geometry, floorMaterial);
+        this.floor.position.set(centerx, centery, 0);
+        // Rotate the floor to make it horizontal
+        this.floor.rotation.x = -Math.PI / 2;
+
+        this.scene.add(this.floor)
     }
 
     // Render method to update and render the scene
