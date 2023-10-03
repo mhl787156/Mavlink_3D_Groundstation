@@ -9,3 +9,11 @@ services:
     volumes:
       - ./gcs_app/src:/app/src
       - ./gcs_app/public:/app/public
+
+  backend:
+    build: backend
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - DEBUG_NO_MAVLINK=true

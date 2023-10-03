@@ -1,0 +1,6 @@
+flask
+pymap3d
+pymavlink
+pyserial
+pillow
+requests
