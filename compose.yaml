@@ -1,0 +1,11 @@
+version: '3'
+services:
+  web:
+    build: gcs_app
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    volumes:
+      - ./gcs_app/src:/app/src
+      - ./gcs_app/public:/app/public
